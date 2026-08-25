@@ -42,8 +42,13 @@ func printUsage() {
 	fmt.Println("Usage: flux <command> [options]")
 	fmt.Println("\nAvailable Commands:")
 	fmt.Println("  rfq        Request two-way firm quote and execute OTC derivative trades")
+	fmt.Println("  price      Run C++20 analytical pricing kernels (Asian APO, Crack spreads)")
+	fmt.Println("  crb        Manage Central Risk Book factor internalization & Almgren-Chriss TWAP")
 	fmt.Println("  blotter    Inspect executed trade records, MTM PnL & SDR audit reports")
 	fmt.Println("  stress     Run extreme stress tests (Negative Oil 2020, Hormuz Closure)")
+	fmt.Println("  cluster    Inspect 3-node Aeron Raft consensus sequencer & log replication")
+	fmt.Println("  report     Generate regulatory compliance records (CFTC Part 43/45, MiFID II)")
+	fmt.Println("  server     Inspect and manage the Flux SaaS control plane API gateway")
 	fmt.Println("  book       Display live L2 order book depth ladder with liquidity bands")
 	fmt.Println("  risk       Inspect Central Risk Book (CRB), 99% VaR & Expected Shortfall")
 	fmt.Println("  curve      Display calibrated forward curve strips & SABR vol surfaces")
@@ -316,10 +321,20 @@ func handleREPL() {
 		switch cmd {
 		case "rfq":
 			handleRFQ(args)
+		case "price":
+			handlePrice(args)
+		case "crb":
+			handleCRB(args)
 		case "blotter":
 			handleBlotter(args)
 		case "stress":
 			handleStress(args)
+		case "cluster":
+			handleCluster(args)
+		case "report":
+			handleReport(args)
+		case "server":
+			handleServer(args)
 		case "book":
 			handleBook(args)
 		case "risk":
@@ -335,7 +350,7 @@ func handleREPL() {
 		case "config":
 			handleConfig(args)
 		case "help":
-			fmt.Println("Commands: rfq, blotter, stress, book, risk, curve, agents, logistics, xva, config, exit")
+			fmt.Println("Commands: rfq, price, crb, blotter, stress, cluster, report, server, book, risk, curve, agents, logistics, xva, config, exit")
 		default:
 			fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", cmd)
 		}
@@ -381,10 +396,20 @@ func main() {
 	switch command {
 	case "rfq":
 		handleRFQ(args)
+	case "price":
+		handlePrice(args)
+	case "crb":
+		handleCRB(args)
 	case "blotter":
 		handleBlotter(args)
 	case "stress":
 		handleStress(args)
+	case "cluster":
+		handleCluster(args)
+	case "report":
+		handleReport(args)
+	case "server":
+		handleServer(args)
 	case "book":
 		handleBook(args)
 	case "risk":

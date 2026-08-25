@@ -1,6 +1,32 @@
-# Flux: World-Class OTC Commodity Derivatives Platform & Terminal CLI
+# Flux: High-Performance OTC Commodity Derivatives Platform & Terminal CLI
 
-Flux is an institutional, multi-tenant quantitative SaaS and CLI platform engineered for OTC commodity derivatives trading (oil & refined products, gas, power). Built to FAANG / quantitative hedge fund engineering standards, it delivers sub-microsecond pricing kernels, zero-allocation memory layouts, automated Central Risk Book (CRB) capital netting, an autonomous multi-agent AI system, and a Bloomberg-grade terminal CLI.
+Flux is an institutional, multi-tenant quantitative SaaS and terminal CLI platform engineered for OTC commodity derivatives trading (oil & refined products, gas, power). Built to FAANG / top-tier quantitative trading standards, every single platform feature is fully operable via the native binary `flux`.
+
+---
+
+## 100% Complete Feature-to-CLI Mapping
+
+Every sub-engine and subsystem in Flux is accessible via the CLI:
+
+| Platform Subsystem | CLI Command | Description & Capabilities |
+| :--- | :--- | :--- |
+| **OTC RFQ & Execution** | `flux rfq` | Request firm two-way streaming quotes (with AI alpha skew), execute trades, and generate UTRs. |
+| **Pricing Kernels** | `flux price <asian\|crack>` | Direct analytical evaluation of Asian APOs (Turnbull-Wakeman) and Crack Spreads (Kirk). |
+| **Central Risk Book** | `flux crb <status\|rebalance>` | Cross-desk risk factor internalization ($75\text{k bbl}$ at $\$0$ fee) and Almgren-Chriss TWAP slicing. |
+| **Market Depth & L2 Book**| `flux book` | Live order book depth ladder with SMM spreads and liquidity bands. |
+| **Tail Risk & Capital** | `flux risk` | 500-scenario Historical 99% 1D-VaR, 97.5% Expected Shortfall (CVaR), and factor netting. |
+| **Forward Curves & Vol** | `flux curve` | Monotonic spline forward strips & SABR implied volatility surface matrix. |
+| **Multi-Agent AI Subsystem** | `flux agents` | Autonomous oil desk triad (Curve Construction, Physical Logistics, Signal Generation, Pricing). |
+| **Physical CTRM & Blending** | `flux logistics` | Track maritime vessel fixtures (VLCC/Suez/Afra), laytime, demurrage, and non-linear API blending. |
+| **Counterparty XVA & SIMM** | `flux xva` | Bilateral CVA, DVA, FVA, and dynamic ISDA SIMM v2.6 Initial Margin / CSA margin call audits. |
+| **Trade Blotter & Ledger** | `flux blotter` | Real-time position ledger, MTM PnL, and CSV/JSON export (`--export csv/json`). |
+| **Crisis Stress Testing** | `flux stress` | Simulate historical (2020 Negative Oil, 2022 War) and geopolitical (Hormuz closure) shocks. |
+| **Aeron Raft Cluster** | `flux cluster <status\|commit>`| 3-node in-memory Raft consensus sequencer ($84\text{ ns}$) and log replication. |
+| **Regulatory Reporting** | `flux report <cftc\|mifid>` | Generate CFTC Part 43/45 (ICE Trade Vault) and MiFID II RTS 22 (DTCC ARM) records. |
+| **SaaS Gateway Control** | `flux server <status\|start>` | Inspect and start the background Go REST/WebSocket SaaS control plane. |
+| **Interactive Terminal Shell**| `flux repl` | Persistent Bloomberg-style terminal shell with interactive command execution. |
+| **Profile & Config Manager**| `flux config <show\|set>` | Manage active tenant, desk ID, API endpoints, and currency settings. |
+| **Streaming Ticker Monitor**| `flux monitor` | Continuous 100ms market tick stream and fast-path latency monitor. |
 
 ---
 
@@ -19,109 +45,39 @@ Flux is an institutional, multi-tenant quantitative SaaS and CLI platform engine
 
 ---
 
-## Codebase Architecture
-
-```
-flux/
-├── cli/
-│   └── main.go                       # World-class terminal CLI with REPL, L2 book ladder & JSON pipeline support
-├── proto/
-│   └── flux_protocol.proto           # Protobuf streaming contracts for curves, surfaces, RFQs & agent signals
-├── core-engine/                      # High-performance C++20 & Rust quantitative core
-│   ├── include/
-│   │   ├── asian_engine.hpp          # Turnbull-Wakeman moment matching Asian APO kernel (625 ns)
-│   │   ├── crack_spread_engine.hpp   # Kirk's crack spread kernel (125 ns)
-│   │   ├── var_engine.hpp            # 500-scenario full-revaluation Historical VaR & Expected Shortfall
-│   │   ├── physical_logistics_engine.hpp # Non-linear specific gravity blending & demurrage (42 ns)
-│   │   └── xva_engine.hpp            # Multi-curve CVA / DVA / FVA kernel (< 100 ns)
-│   ├── tests/
-│   │   └── test_pricing.cpp          # C++ unit & boundary condition test suite (5/5 PASSED)
-│   ├── src/
-│   │   ├── lib.rs                    # Rust core library with embedded test suite (4/4 PASSED)
-│   │   ├── main.rs                   # Rust CRB, SMM quoter & Aeron sequencer benchmark
-│   │   ├── crb_hedger.rs             # Cross-desk internalization & Almgren-Chriss optimal hedging
-│   │   ├── smm_quoter.rs             # Avellaneda-Stoikov market-making with AI alpha skew
-│   │   ├── collateral_simm_manager.rs # Dynamic ISDA SIMM margin call evaluator (42 ns)
-│   │   └── aeron_cluster_sequencer.rs # 3-node Raft consensus replicated sequencer (84 ns)
-│   └── Cargo.toml
-├── agents/                           # Multi-Agent AI Subsystem (Oil Derivatives Desk)
-│   ├── tests/
-│   │   └── test_agents.py            # Python agent unit test suite (PASSED)
-│   ├── curve_construction_agent.py   # Forward strip bootstrapping & splining
-│   ├── physical_logistics_agent.py   # Maritime vessel tracking & laytime audits
-│   ├── signal_generation_agent.py    # Refinery runs, tanker congestion & inventory alpha
-│   ├── pricing_compute_agent.py      # Non-linear Asian option pricer & Greeks
-│   ├── orchestrator.py               # Multi-agent coordinator & quote synthesizer
-│   └── state.py
-├── saas-control/                     # Enterprise SaaS Control Plane & API Gateway
-│   ├── schema.sql                    # PostgreSQL 16 DDL with native Row-Level Security (RLS)
-│   ├── main.go                       # Zero-allocation REST/WebSocket server with buffer pools & graceful shutdown
-│   ├── main_test.go                  # Go unit tests for RFQ lifecycle & trade execution (PASSED)
-│   └── go.mod
-├── docker/                           # Multi-Stage Production Containers
-│   ├── Dockerfile.core               # C++ & Rust optimized container
-│   ├── Dockerfile.agents             # Python AI runtime
-│   └── Dockerfile.saas               # Go API server
-├── docker-compose.yml                # Local orchestration (PostgreSQL + QuestDB + Redis + Core + SaaS)
-└── .github/workflows/ci.yml          # GitHub Actions CI Quality Gate across all 4 runtimes
-```
-
----
-
 ## Terminal CLI Quickstart
 
-Build the native CLI binary:
+Build the CLI binary:
 ```bash
-go build -o bin/flux cli/main.go
+go build -o bin/flux cli/*.go
 ```
 
-### 1. Interactive Terminal REPL Mode
-Launch an interactive Bloomberg-style terminal shell:
+### Example Workflows
+
 ```bash
+# 1. Interactive Terminal Shell
 ./bin/flux repl
-# flux [OIL_DESK_LONDON] > rfq --underlying BRENT --strike 82.50 --qty 50000 --execute BUY
-# flux [OIL_DESK_LONDON] > book
-# flux [OIL_DESK_LONDON] > risk
-```
 
-### 2. Real-Time L2 Order Book Depth Ladder
-Display live market depth with spread, SMM quote skew, and liquidity bands:
-```bash
-./bin/flux book
-```
+# 2. Price a Custom Asian Option with Greeks
+./bin/flux price asian --strike 82.50 --fwd 82.50 --ttm 0.25 --vol 0.28 --fixings 21
 
-### 3. OTC RFQ Negotiation & Execution (with `--json` pipeline support)
-```bash
-# Human readable output
+# 3. Request Firm OTC Quote and Execute
 ./bin/flux rfq --underlying BRENT --strike 82.50 --qty 50000 --execute BUY
 
-# UNIX pipeline composable JSON output
-./bin/flux rfq --underlying BRENT --strike 82.50 --qty 50000 --json | jq .
-```
+# 4. Central Risk Book Rebalancing & Optimal TWAP Hedging
+./bin/flux crb rebalance --horizon 300
 
-### 4. Central Risk Book (CRB) & Cross-Desk Netting
-```bash
-./bin/flux risk
-```
+# 5. Check Trade Blotter & Export to CSV
+./bin/flux blotter --export csv > executed_trades.csv
 
-### 5. Forward Curves & SABR Implied Volatility Surface
-```bash
-./bin/flux curve --underlying BRENT
-```
+# 6. Run Negative Oil 2020 Stress Test
+./bin/flux stress --scenario NEGATIVE_OIL_2020
 
-### 6. Multi-Agent AI Subsystem Execution
-```bash
-./bin/flux agents
-```
+# 7. Check 3-Node Aeron Consensus Cluster
+./bin/flux cluster status
 
-### 7. Physical CTRM Logistics & Demurrage Monitor
-```bash
-./bin/flux logistics
-```
-
-### 8. Bilateral XVA (CVA/DVA/FVA) & ISDA SIMM Margin Calls
-```bash
-./bin/flux xva
+# 8. Generate MiFID II Regulatory Report
+./bin/flux report mifid --utr UTR-FLUX-BUY-1787683804
 ```
 
 ---
