@@ -37,7 +37,7 @@ struct alignas(64) PricingResult {
 
 class TurnbullWakemanAsianKernel {
 public:
-    // Cody's rational Chebyshev minimax polynomial approximation for normal CDF (5x faster than std::erfc)
+    // Cody's rational Chebyshev minimax polynomial approximation for normal CDF
     static inline double fast_norm_cdf(double z) noexcept {
         if (z > 6.0) return 1.0;
         if (z < -6.0) return 0.0;
@@ -113,11 +113,12 @@ public:
         M2 /= static_cast<double>(k * k);
 
         // Effective Volatility and Effective Forward
-        const double effective_var = std::log(M2 / (M1 * M1));
-        const double effective_vol = std::sqrt(std::max(0.0, effective_var) / input.time_to_maturity);
-        const double F_eff = remaining_weight * M1;
+        const double ttm = std::max(1e-6, input.time_to_maturity);
+        const double effective_var = std::log(std::max(1e-8, M2 / (M1 * M1)));
+        const double effective_vol = std::sqrt(std::max(0.0, effective_var) / ttm);
+        const double F_eff = std::max(1e-8, remaining_weight * M1);
         const double K_eff = adjusted_strike;
-        const double df = std::exp(-input.risk_free_rate * input.time_to_maturity);
+        const double df = std::exp(-input.risk_free_rate * ttm);
 
         PricingResult result{};
 
@@ -130,7 +131,7 @@ public:
                 result.delta = 0.0;
             }
         } else {
-            const double sigma_sqrt_T = effective_vol * std::sqrt(input.time_to_maturity);
+            const double sigma_sqrt_T = std::max(1e-8, effective_vol * std::sqrt(ttm));
             const double d1 = (std::log(F_eff / K_eff) + 0.5 * effective_var) / sigma_sqrt_T;
             const double d2 = d1 - sigma_sqrt_T;
             const double nd1 = fast_norm_cdf(d1);
@@ -146,8 +147,8 @@ public:
             }
 
             result.gamma = (df * npdf_d1) / (F_eff * sigma_sqrt_T);
-            result.vega = df * F_eff * std::sqrt(input.time_to_maturity) * npdf_d1;
-            result.theta = -(df * F_eff * npdf_d1 * effective_vol) / (2.0 * std::sqrt(input.time_to_maturity));
+            result.vega = df * F_eff * std::sqrt(ttm) * npdf_d1;
+            result.theta = -(df * F_eff * npdf_d1 * effective_vol) / (2.0 * std::sqrt(ttm));
         }
 
         const auto end_time = std::chrono::high_resolution_clock::now();

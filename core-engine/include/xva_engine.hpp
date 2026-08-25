@@ -32,15 +32,19 @@ public:
         auto start = std::chrono::high_resolution_clock::now();
 
         const size_t N = params.time_grid.size();
+        if (N == 0 || params.expected_positive_exposure.size() < N || params.expected_negative_exposure.size() < N) {
+            return XVAMetricsResult{};
+        }
+
         double cva = 0.0;
         double dva = 0.0;
         double fva = 0.0;
-        double lgd = 1.0 - params.recovery_rate; // Loss Given Default
+        double lgd = std::max(0.0, 1.0 - params.recovery_rate); // Loss Given Default
 
         double prev_t = 0.0;
         for (size_t i = 0; i < N; ++i) {
             double t = params.time_grid[i];
-            double dt = t - prev_t;
+            double dt = std::max(0.0, t - prev_t);
             double df = std::exp(-params.risk_free_rate * t);
 
             // Marginal Default Probability of Counterparty: dPD = exp(-lambda*t_prev) - exp(-lambda*t)
@@ -49,10 +53,10 @@ public:
             double pd_own = std::exp(-params.own_hazard_rate * prev_t) - std::exp(-params.own_hazard_rate * t);
 
             // CVA = LGD * Sum( DF(t) * EPE(t) * dPD_cpty )
-            cva += lgd * df * params.expected_positive_exposure[i] * pd_cpty;
+            cva += lgd * df * params.expected_positive_exposure[i] * std::max(0.0, pd_cpty);
 
             // DVA = LGD_own * Sum( DF(t) * ENE(t) * dPD_own )
-            dva += lgd * df * params.expected_negative_exposure[i] * pd_own;
+            dva += lgd * df * params.expected_negative_exposure[i] * std::max(0.0, pd_own);
 
             // FVA = Sum( DF(t) * (EPE(t) - ENE(t)) * FundingSpread * dt )
             double net_exposure = params.expected_positive_exposure[i] - params.expected_negative_exposure[i];
