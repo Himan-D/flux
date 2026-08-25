@@ -11,16 +11,18 @@ void test_asian_option_boundaries() {
     std::cout << "[TEST] Asian Option Boundary Conditions...";
     flux::pricing::AsianPricerInput input{};
     input.is_call = true;
-    input.strike = 50.0; // Deep ITM
+    input.strike = 50.0;
     input.risk_free_rate = 0.05;
     input.time_to_maturity = 0.5;
     input.total_fixings_count = 10;
-    input.realized_fixings = {100.0, 100.0, 100.0, 100.0, 100.0};
+    input.realized_count = 5;
+    input.remaining_count = 5;
     
-    for (int i = 0; i < 5; ++i) {
-        input.forward_strip.push_back(100.0);
-        input.time_points.push_back(0.1 * (i + 1));
-        input.volatilities.push_back(0.20);
+    for (size_t i = 0; i < 5; ++i) {
+        input.realized_fixings[i] = 100.0;
+        input.forward_strip[i] = 100.0;
+        input.time_points[i] = 0.1 * (i + 1);
+        input.volatilities[i] = 0.20;
     }
 
     auto res = flux::pricing::TurnbullWakemanAsianKernel::price(input);
@@ -37,7 +39,7 @@ void test_crack_spread_pricing() {
         .is_call = true,
         .forward_product = 100.0,
         .forward_crude = 80.0,
-        .strike_spread = 20.0, // ATM
+        .strike_spread = 20.0,
         .vol_product = 0.30,
         .vol_crude = 0.25,
         .correlation = 0.80,
@@ -58,7 +60,7 @@ void test_var_and_expected_shortfall() {
         -1000.0, -800.0, -600.0, -400.0, -200.0, 0.0, 100.0, 200.0, 300.0, 400.0,
         -950.0, -750.0, -550.0, -350.0, -150.0, 50.0, 150.0, 250.0, 350.0, 450.0
     };
-    for (int i = 0; i < 80; ++i) pnls.push_back(100.0 * (i + 1)); // 100 scenarios total
+    for (int i = 0; i < 80; ++i) pnls.push_back(100.0 * (i + 1));
 
     auto res = flux::risk::RiskEngine::compute_var_and_es(pnls);
     assert(res.var_99_1d >= res.var_95_1d && "99% VaR must be greater than or equal to 95% VaR");
@@ -80,8 +82,8 @@ void test_crude_blending_conservation() {
 
     auto res = flux::logistics::PhysicalLogisticsEngine::compute_crude_blend(blend);
     assert(res.total_volume_bbl == 1000000.0 && "Volume must be strictly additive");
-    assert(res.blended_api_gravity > 20.0 && res.blended_api_gravity < 40.0 && "Blended API must be strictly bounded");
-    assert(res.blended_sulfur_pct > 0.20 && res.blended_sulfur_pct < 3.00 && "Blended sulfur must be strictly bounded");
+    assert(res.blended_api_gravity > 20.0 && res.blended_api_gravity < 40.0);
+    assert(res.blended_sulfur_pct > 0.20 && res.blended_sulfur_pct < 3.00);
     std::cout << " PASSED\n";
 }
 
