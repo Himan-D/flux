@@ -3,67 +3,43 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: flux-postgres
+    container_name: flux-postgres-rls
     environment:
+      POSTGRES_DB: flux_prod
       POSTGRES_USER: flux_admin
-      POSTGRES_PASSWORD: flux_secure_password
-      POSTGRES_DB: flux_trading
+      POSTGRES_PASSWORD: flux_secure_password_2026
     ports:
       - "5432:5432"
     volumes:
-      - ./saas-control/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./saas-control/schema.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flux_admin -d flux_trading"]
+      test: ["CMD-SHELL", "pg_isready -U flux_admin -d flux_prod"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  questdb:
-    image: questdb/questdb:latest
-    container_name: flux-questdb
-    ports:
-      - "9000:9000"  # Web Console / REST
-      - "9009:9009"  # InfluxDB Line Protocol (ILP)
-      - "8812:8812"  # Postgres Wire Protocol
-    environment:
-      - QDB_CACHED_BUFFER_LEN=1048576
-
-  redis:
-    image: redis:7-alpine
-    container_name: flux-redis
-    ports:
-      - "6379:6379"
-
-  saas-control:
+  flux-gateway:
     build:
       context: .
-      dockerfile: docker/Dockerfile.saas
-    container_name: flux-saas-control
+      dockerfile: Dockerfile
+    container_name: flux-saas-gateway
+    environment:
+      PORT: "8080"
+      FLUX_ENV: "production"
+      DATABASE_URL: "postgresql://flux_admin:flux_secure_password_2026@postgres:5432/flux_prod"
+      FLUX_JWT_SECRET: "flux-enterprise-secret-key-2026-sha256"
     ports:
       - "8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
-    environment:
-      - PORT=8080
-      - DB_HOST=postgres
-      - DB_USER=flux_admin
-      - DB_PASSWORD=flux_secure_password
-      - DB_NAME=flux_trading
 
-  core-engine:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.core
-    container_name: flux-core-engine
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: flux-prometheus
+    volumes:
+      - ./k8s/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
     depends_on:
-      - questdb
-      - redis
-
-  agents:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.agents
-    container_name: flux-multi-agent-system
-    depends_on:
-      - redis
+      - flux-gateway
