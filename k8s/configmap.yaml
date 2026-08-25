@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flux-config
+  namespace: flux-prod
+data:
+  PORT: "8080"
+  FLUX_ENV: "production"
+  AERON_CLUSTER_HOST: "aeron-cluster.flux-prod.svc.cluster.local:40123"
+  DATABASE_URL: "postgresql://flux_admin@postgres-primary.flux-prod.svc.cluster.local:5432/flux_prod"
+  QUESTDB_URL: "questdb.flux-prod.svc.cluster.local:9000"
+  PROMETHEUS_METRICS_ENABLED: "true"

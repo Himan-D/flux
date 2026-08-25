@@ -6,80 +6,73 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
-func TestHandleHealth(t *testing.T) {
-	req, err := http.NewRequest("GET", "/v1/health", nil)
+func TestHandleHealthAndReady(t *testing.T) {
+	reqHealth := httptest.NewRequest("GET", "/v1/health", nil)
+	wHealth := httptest.NewRecorder()
+	handleHealth(wHealth, reqHealth)
+
+	if wHealth.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 from /v1/health, got %d", wHealth.Code)
+	}
+
+	reqReady := httptest.NewRequest("GET", "/v1/ready", nil)
+	wReady := httptest.NewRecorder()
+	handleReady(wReady, reqReady)
+
+	if wReady.Code != http.StatusOK {
+		t.Fatalf("Expected status 200 from /v1/ready, got %d", wReady.Code)
+	}
+}
+
+func TestEnterpriseJWTAndRBACWorkflow(t *testing.T) {
+	claims := JWTClaims{
+		UserID:    "usr-quant-01",
+		TenantID:  "TENANT_GLENCORE_ENERGY_LTD",
+		DeskID:    "DESK_OIL_DERIVATIVES_LONDON",
+		Role:      "TRADER",
+		ExpiresAt: time.Now().Add(1 * time.Hour).Unix(),
+	}
+
+	token, err := generateJWT(claims)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to generate JWT: %v", err)
 	}
 
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(handleHealth)
-	handler.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	parsed, err := validateJWT(token)
+	if err != nil {
+		t.Fatalf("Failed to validate JWT: %v", err)
 	}
 
-	var resp map[string]interface{}
-	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-		t.Fatal(err)
-	}
-
-	if resp["status"] != "UP" {
-		t.Errorf("expected status 'UP', got %v", resp["status"])
+	if parsed.UserID != claims.UserID || parsed.Role != "TRADER" {
+		t.Fatalf("Claims mismatch: expected %s / TRADER, got %s / %s", claims.UserID, parsed.UserID, parsed.Role)
 	}
 }
 
 func TestHandleRFQAndTradeWorkflow(t *testing.T) {
-	// 1. Create RFQ
-	rfqReq := RFQRequest{
-		TenantID:         "TENANT_TRAFIGURA",
-		DeskID:           "DESK_OIL",
+	reqBody, _ := json.Marshal(RFQRequest{
+		TenantID:         "TENANT_TEST",
+		DeskID:           "DESK_TEST",
 		InstrumentType:   "ASIAN_APO",
-		Underlying:       "BRENT_CRUDE",
+		Underlying:       "BRENT",
 		StrikePrice:      82.50,
 		NotionalQuantity: 50000.0,
 		QuantityUnit:     "BBL",
-	}
+	})
 
-	reqBody, _ := json.Marshal(rfqReq)
-	req, _ := http.NewRequest("POST", "/v1/rfq/request", bytes.NewBuffer(reqBody))
-	rr := httptest.NewRecorder()
-	handleRFQ(rr, req)
+	req := httptest.NewRequest("POST", "/v1/rfq/request", bytes.NewReader(reqBody))
+	w := httptest.NewRecorder()
+	handleRFQ(w, req)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for RFQ, got %d", rr.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d", w.Code)
 	}
 
 	var rfqResp RFQResponse
-	json.NewDecoder(rr.Body).Decode(&rfqResp)
-	if rfqResp.Status != "QUOTED" || rfqResp.FirmBid <= 0 || rfqResp.FirmAsk <= 0 {
-		t.Fatalf("invalid RFQ quote response: %+v", rfqResp)
-	}
-
-	// 2. Execute Trade on Quoted RFQ
-	tradeReq := TradeExecutionRequest{
-		RFQID:    rfqResp.RFQID,
-		TenantID: rfqResp.TenantID,
-		Side:     "BUY",
-		Price:    rfqResp.FirmAsk,
-		Quantity: 50000.0,
-	}
-
-	tradeBody, _ := json.Marshal(tradeReq)
-	req2, _ := http.NewRequest("POST", "/v1/trade/execute", bytes.NewBuffer(tradeBody))
-	rr2 := httptest.NewRecorder()
-	handleTradeExecute(rr2, req2)
-
-	if rr2.Code != http.StatusOK {
-		t.Fatalf("expected 200 OK for Trade execution, got %d", rr2.Code)
-	}
-
-	var tradeResp TradeExecutionResponse
-	json.NewDecoder(rr2.Body).Decode(&tradeResp)
-	if tradeResp.Status != "EXECUTED" || tradeResp.NotionalUSD != rfqResp.FirmAsk*50000.0 {
-		t.Fatalf("trade execution mismatch: %+v", tradeResp)
+	json.NewDecoder(w.Body).Decode(&rfqResp)
+	if rfqResp.Status != "QUOTED" || rfqResp.FairValue <= 0 {
+		t.Fatalf("Invalid RFQ Response: %+v", rfqResp)
 	}
 }

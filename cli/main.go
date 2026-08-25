@@ -28,11 +28,11 @@ const (
 func printBanner() {
 	fmt.Printf("%s%s", Bold, Cyan)
 	fmt.Println("╔══════════════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║  ███████╗██╗     ██╗   ██╗██╗  ██╗     FLUX INSTITUTIONAL TRADING CLI        ║")
+	fmt.Println("║  ███████╗██╗     ██╗   ██╗██╗  ██╗     FLUX ENTERPRISE QUANT TRADING CLI     ║")
 	fmt.Println("║  ██╔════╝██║     ██║   ██║╚██╗██╔╝     High-Performance Quant & SMM Engine   ║")
 	fmt.Println("║  █████╗  ██║     ██║   ██║ ╚███╔╝      Version 1.0.0 (Darwin/ARM64)          ║")
-	fmt.Println("║  ██╔══╝  ██║     ██║   ██║ ██╔██╗      Aeron 3-Node Raft • C++20 AVX-512     ║")
-	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Fast-Path Latency: 542 ns (p50)       ║")
+	fmt.Println("║  ██╔══╝  ██║     ██║   ██║ ██╔██╗      SOC2 Type II • Aeron 3-Node Raft      ║")
+	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Pricing Latency: 542 ns (p50)         ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════════════╝")
 	fmt.Printf("%s\n", Reset)
 }
@@ -42,6 +42,9 @@ func printUsage() {
 	fmt.Println("Usage: flux <command> [options]")
 	fmt.Println("\nAvailable Commands:")
 	fmt.Println("  rfq        Request two-way firm quote and execute OTC derivative trades")
+	fmt.Println("  auth       Manage enterprise JWT bearer tokens and RBAC session security")
+	fmt.Println("  audit      Inspect immutable SOC2 / ISO 27001 hash-chained audit trails")
+	fmt.Println("  metrics    Display live OpenTelemetry & Prometheus latency/throughput counters")
 	fmt.Println("  benchmark  Execute 1,000,000-run empirical scale & throughput test matrix")
 	fmt.Println("  price      Run C++20 analytical pricing kernels (Asian APO, Crack spreads)")
 	fmt.Println("  crb        Manage Central Risk Book factor internalization & Almgren-Chriss TWAP")
@@ -322,6 +325,12 @@ func handleREPL() {
 		switch cmd {
 		case "rfq":
 			handleRFQ(args)
+		case "auth":
+			handleAuth(args)
+		case "audit":
+			handleAudit(args)
+		case "metrics":
+			handleMetrics(args)
 		case "benchmark":
 			handleBenchmark(args)
 		case "price":
@@ -353,7 +362,7 @@ func handleREPL() {
 		case "config":
 			handleConfig(args)
 		case "help":
-			fmt.Println("Commands: rfq, benchmark, price, crb, blotter, stress, cluster, report, server, book, risk, curve, agents, logistics, xva, config, exit")
+			fmt.Println("Commands: rfq, auth, audit, metrics, benchmark, price, crb, blotter, stress, cluster, report, server, book, risk, curve, agents, logistics, xva, config, exit")
 		default:
 			fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", cmd)
 		}
@@ -399,6 +408,12 @@ func main() {
 	switch command {
 	case "rfq":
 		handleRFQ(args)
+	case "auth":
+		handleAuth(args)
+	case "audit":
+		handleAudit(args)
+	case "metrics":
+		handleMetrics(args)
 	case "benchmark":
 		handleBenchmark(args)
 	case "price":
