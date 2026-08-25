@@ -1,4 +1,5 @@
 # Binaries
+bin/
 core-engine/pricing_benchmark
 saas-control/saas_server
 *.exe
@@ -23,11 +24,3 @@ env/
 .DS_Store
 .vscode/
 .idea/
-
-# Node / Frontend
-node_modules/
-frontend/node_modules/
-dist/
-frontend/dist/
-frontend/package-lock.json
-bin/
