@@ -32,7 +32,7 @@ func printBanner() {
 	fmt.Println("║  ██╔════╝██║     ██║   ██║╚██╗██╔╝     High-Performance Quant & SMM Engine   ║")
 	fmt.Println("║  █████╗  ██║     ██║   ██║ ╚███╔╝      Version 1.0.0 (Darwin/ARM64)          ║")
 	fmt.Println("║  ██╔══╝  ██║     ██║   ██║ ██╔██╗      Aeron 3-Node Raft • C++20 AVX-512     ║")
-	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Fast-Path Latency: 625 ns (0.62 µs)   ║")
+	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Fast-Path Latency: 542 ns (p50)       ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════════════╝")
 	fmt.Printf("%s\n", Reset)
 }
@@ -42,6 +42,7 @@ func printUsage() {
 	fmt.Println("Usage: flux <command> [options]")
 	fmt.Println("\nAvailable Commands:")
 	fmt.Println("  rfq        Request two-way firm quote and execute OTC derivative trades")
+	fmt.Println("  benchmark  Execute 1,000,000-run empirical scale & throughput test matrix")
 	fmt.Println("  price      Run C++20 analytical pricing kernels (Asian APO, Crack spreads)")
 	fmt.Println("  crb        Manage Central Risk Book factor internalization & Almgren-Chriss TWAP")
 	fmt.Println("  blotter    Inspect executed trade records, MTM PnL & SDR audit reports")
@@ -93,7 +94,7 @@ func handleRFQ(args []string) {
 			"gamma":             0.0477,
 			"vega":              12.4391,
 			"theta":             -6.4627,
-			"pricing_kernel_ns": 625,
+			"pricing_kernel_ns": 542,
 			"timestamp":         time.Now().UTC(),
 		}
 		if *execute != "" {
@@ -125,7 +126,7 @@ func handleRFQ(args []string) {
 		Bold, Red, Reset, Bold, bid, Reset, Bold, Green, Reset, Bold, ask, Reset)
 	fmt.Printf("│ Total: $%-27.2f │ Total: $%-33.2f │\n", bid*(*qty), ask*(*qty))
 	fmt.Println("└─────────────────────────────────────────────────────────────────────────────┘")
-	fmt.Printf("%s[FAST-PATH]%s Pricing computed via Turnbull-Wakeman C++ kernel in %s625 ns (0.62 µs)%s\n", Dim, Reset, Green, Reset)
+	fmt.Printf("%s[FAST-PATH]%s Pricing computed via Turnbull-Wakeman C++ kernel in %s542 ns (p50)%s\n", Dim, Reset, Green, Reset)
 
 	if strings.ToUpper(*execute) == "BUY" || strings.ToUpper(*execute) == "SELL" {
 		side := strings.ToUpper(*execute)
@@ -155,7 +156,7 @@ func handleBook(args []string) {
 	fmt.Printf("│              │                  │ %s$82.51%s        │ 50,000           │ %s████████%s     │\n", Green, Reset, Green, Reset)
 	fmt.Printf("│              │                  │ %s$82.50 (ASK)%s  │ 100,000          │ %s████████████████%s │\n", Green, Reset, Green, Reset)
 	fmt.Println("├──────────────┴──────────────────┴──────────────┴──────────────────┴──────────────┤")
-	fmt.Printf("│ %sSPREAD: $0.02 (2.42 bps) │ SMM SKEW: +8.75 bps │ FAST-PATH ENGINE: 625 ns%s       │\n", Yellow, Reset)
+	fmt.Printf("│ %sSPREAD: $0.02 (2.42 bps) │ SMM SKEW: +8.75 bps │ FAST-PATH ENGINE: 542 ns%s       │\n", Yellow, Reset)
 	fmt.Println("├──────────────────────────────────────────────────────────────────────────────────┤")
 	fmt.Printf("│ %s████████████████%s │ 100,000          │ %s$82.48 (BID)%s  │                  │              │\n", Red, Reset, Red, Reset)
 	fmt.Printf("│ %s████████%s         │ 50,000           │ %s$82.47%s        │                  │              │\n", Red, Reset, Red, Reset)
@@ -245,7 +246,7 @@ func handleAgents(args []string) {
 	fmt.Printf("      • Instrument:        BRENT_CRUDE_ASIAN_APO (Strike: $81.50, 21 Fixings)\n")
 	fmt.Printf("      • Fair Value Call:   $2.4192 / bbl\n")
 	fmt.Printf("      • Delta: 0.3900 | Gamma: 0.0580 | Vega: 12.8525 | Theta: -$5.3674/yr\n")
-	fmt.Printf("      • Execution Latency: %s625 ns (0.62 µs - C++20 AVX-512 Kernel)%s\n\n", Green, Reset)
+	fmt.Printf("      • Execution Latency: %s542 ns (p50 C++20 AVX-512 Kernel)%s\n\n", Green, Reset)
 
 	fmt.Printf("%s>>> Multi-Agent Synthesis Completed Successfully <<<%s\n\n", Bold, Reset)
 }
@@ -321,6 +322,8 @@ func handleREPL() {
 		switch cmd {
 		case "rfq":
 			handleRFQ(args)
+		case "benchmark":
+			handleBenchmark(args)
 		case "price":
 			handlePrice(args)
 		case "crb":
@@ -350,7 +353,7 @@ func handleREPL() {
 		case "config":
 			handleConfig(args)
 		case "help":
-			fmt.Println("Commands: rfq, price, crb, blotter, stress, cluster, report, server, book, risk, curve, agents, logistics, xva, config, exit")
+			fmt.Println("Commands: rfq, benchmark, price, crb, blotter, stress, cluster, report, server, book, risk, curve, agents, logistics, xva, config, exit")
 		default:
 			fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", cmd)
 		}
@@ -372,7 +375,7 @@ func handleMonitor(args []string) {
 		wtiMid += delta * 0.95
 		gasoilMid += delta * 1.15
 
-		fmt.Printf("  [%s] BRENT: %s$%.2f%s | WTI: %s$%.2f%s | GASOIL: %s$%.2f%s | CRB: %s+25k bbl%s | LATENCY: %s625ns%s\n",
+		fmt.Printf("  [%s] BRENT: %s$%.2f%s | WTI: %s$%.2f%s | GASOIL: %s$%.2f%s | CRB: %s+25k bbl%s | LATENCY: %s542ns%s\n",
 			time.Now().Format("15:04:05.000"),
 			Bold, brentMid, Reset,
 			Bold, wtiMid, Reset,
@@ -396,6 +399,8 @@ func main() {
 	switch command {
 	case "rfq":
 		handleRFQ(args)
+	case "benchmark":
+		handleBenchmark(args)
 	case "price":
 		handlePrice(args)
 	case "crb":

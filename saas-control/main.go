@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"net/http"
 	"os"
@@ -62,16 +63,37 @@ type TradeExecutionResponse struct {
 	ExecutionTime time.Time `json:"execution_time"`
 }
 
-type ServerState struct {
+// 16-way sharded state to eliminate lock contention under extreme concurrency
+const numShards = 16
+
+type StateShard struct {
 	sync.RWMutex
 	rfqs   map[string]RFQResponse
 	trades map[string]TradeExecutionResponse
 }
 
-var state = ServerState{
-	rfqs:   make(map[string]RFQResponse),
-	trades: make(map[string]TradeExecutionResponse),
+type ShardedServerState struct {
+	shards [numShards]*StateShard
 }
+
+func getShardIndex(key string) int {
+	h := fnv.New32a()
+	h.Write([]byte(key))
+	return int(h.Sum32() % numShards)
+}
+
+func newShardedState() *ShardedServerState {
+	s := &ShardedServerState{}
+	for i := 0; i < numShards; i++ {
+		s.shards[i] = &StateShard{
+			rfqs:   make(map[string]RFQResponse, 10000),
+			trades: make(map[string]TradeExecutionResponse, 10000),
+		}
+	}
+	return s
+}
+
+var state = newShardedState()
 
 func handleRFQ(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
@@ -88,7 +110,6 @@ func handleRFQ(w http.ResponseWriter, r *http.Request) {
 
 	rfqID := fmt.Sprintf("rfq-%d", time.Now().UnixNano())
 	
-	// Integrated C++ Turnbull-Wakeman calibrated outputs
 	fairVal := 3.3714
 	bid := 3.3971
 	ask := 3.4971
@@ -107,9 +128,10 @@ func handleRFQ(w http.ResponseWriter, r *http.Request) {
 		LatencyMicros:   latencyMicros,
 	}
 
-	state.Lock()
-	state.rfqs[rfqID] = resp
-	state.Unlock()
+	shard := state.shards[getShardIndex(rfqID)]
+	shard.Lock()
+	shard.rfqs[rfqID] = resp
+	shard.Unlock()
 
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
@@ -150,9 +172,10 @@ func handleTradeExecute(w http.ResponseWriter, r *http.Request) {
 		ExecutionTime: time.Now().UTC(),
 	}
 
-	state.Lock()
-	state.trades[tradeID] = resp
-	state.Unlock()
+	shard := state.shards[getShardIndex(tradeID)]
+	shard.Lock()
+	shard.trades[tradeID] = resp
+	shard.Unlock()
 
 	buf := bufferPool.Get().(*bytes.Buffer)
 	buf.Reset()
@@ -203,7 +226,6 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown on SIGINT / SIGTERM
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
