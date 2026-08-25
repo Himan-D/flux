@@ -1,6 +1,6 @@
 import React from 'react';
 import { PositionRisk } from '../types';
-import { ShieldAlert, Layers, DollarSign } from 'lucide-react';
+import { Layers } from 'lucide-react';
 
 export const RiskDashboard: React.FC = () => {
   const positions: PositionRisk[] = [
@@ -22,7 +22,6 @@ export const RiskDashboard: React.FC = () => {
         </span>
       </div>
 
-      {/* Real-time VaR & Tail Risk Top Cards */}
       <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
         <div className="bg-fluxDark p-3 rounded border border-fluxBorder">
           <span className="text-gray-400 block mb-1">99% 1-DAY HISTORICAL VaR</span>
@@ -41,7 +40,6 @@ export const RiskDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Desk Exposures Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">
           <thead className="bg-fluxDark text-gray-400 border-b border-fluxBorder">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { VesselLogistics } from '../types';
-import { Anchor, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Anchor } from 'lucide-react';
 
 export const LogisticsDesk: React.FC = () => {
   const voyages: VesselLogistics[] = [

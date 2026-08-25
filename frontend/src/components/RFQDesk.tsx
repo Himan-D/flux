@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QuoteData } from '../types';
-import { TrendingUp, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { TrendingUp, CheckCircle2 } from 'lucide-react';
 
 export const RFQDesk: React.FC = () => {
   const [strike, setStrike] = useState(82.50);
@@ -12,7 +12,7 @@ export const RFQDesk: React.FC = () => {
 
   const quote: QuoteData = {
     fairValue: 3.3749,
-    bid: 3.3249 + (8.75 / 10000) * 82.5, // AI Skewed
+    bid: 3.3249 + (8.75 / 10000) * 82.5,
     ask: 3.4249 + (8.75 / 10000) * 82.5,
     delta: 0.4062,
     gamma: 0.0477,
@@ -25,7 +25,7 @@ export const RFQDesk: React.FC = () => {
     setIsExecuting(true);
     setTimeout(() => {
       setIsExecuting(false);
-      setExecutedTrade(`UTR-FLUX-OTC-${Math.floor(100000 + Math.random() * 900000)}`);
+      setExecutedTrade(`UTR-FLUX-${side}-${Math.floor(100000 + Math.random() * 900000)}`);
     }, 300);
   };
 

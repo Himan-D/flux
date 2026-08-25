@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, ShieldCheck, Zap, Server } from 'lucide-react';
+import { ShieldCheck, Zap, Server } from 'lucide-react';
 
 export const Header: React.FC = () => {
   return (
