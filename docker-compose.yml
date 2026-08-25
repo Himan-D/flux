@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flux-postgres
+    environment:
+      POSTGRES_USER: flux_admin
+      POSTGRES_PASSWORD: flux_secure_password
+      POSTGRES_DB: flux_trading
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./saas-control/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flux_admin -d flux_trading"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  questdb:
+    image: questdb/questdb:latest
+    container_name: flux-questdb
+    ports:
+      - "9000:9000"  # Web Console / REST
+      - "9009:9009"  # InfluxDB Line Protocol (ILP)
+      - "8812:8812"  # Postgres Wire Protocol
+    environment:
+      - QDB_CACHED_BUFFER_LEN=1048576
+
+  redis:
+    image: redis:7-alpine
+    container_name: flux-redis
+    ports:
+      - "6379:6379"
+
+  saas-control:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.saas
+    container_name: flux-saas-control
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PORT=8080
+      - DB_HOST=postgres
+      - DB_USER=flux_admin
+      - DB_PASSWORD=flux_secure_password
+      - DB_NAME=flux_trading
+
+  core-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.core
+    container_name: flux-core-engine
+    depends_on:
+      - questdb
+      - redis
+
+  agents:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agents
+    container_name: flux-multi-agent-system
+    depends_on:
+      - redis

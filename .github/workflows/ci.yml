@@ -1,0 +1,54 @@
+name: Flux CI / Quality Gate
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  cpp-test:
+    name: C++20 Pricing & CTRM Kernels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & Run C++ Tests
+        run: |
+          clang++ -std=c++20 -O3 -Icore-engine/include core-engine/tests/test_pricing.cpp -o run_tests
+          ./run_tests
+
+  rust-test:
+    name: Rust CRB, SMM & Aeron Sequencer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Cargo Tests
+        working-directory: core-engine
+        run: cargo test --verbose
+
+  go-test:
+    name: Go SaaS Control Plane & API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Run Go Tests
+        working-directory: saas-control
+        run: go test -v ./...
+
+  python-test:
+    name: Python Multi-Agent AI Subsystem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run Python Agent Tests
+        working-directory: agents
+        run: |
+          pip install -r requirements.txt pytest
+          python -m pytest tests/
