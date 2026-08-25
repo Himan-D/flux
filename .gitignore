@@ -1,0 +1,25 @@
+# Binaries
+core-engine/pricing_benchmark
+saas-control/saas_server
+*.exe
+*.o
+*.so
+*.dylib
+
+# Rust
+target/
+core-engine/target/
+Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/

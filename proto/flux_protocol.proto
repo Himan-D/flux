@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package flux.trading.v1;
+
+import "google/protobuf/timestamp.proto";
+
+enum CommodityUnderlying {
+  COMMODITY_UNDERLYING_UNSPECIFIED = 0;
+  BRENT_CRUDE = 1;
+  WTI_CRUDE = 2;
+  DUBAI_CRUDE = 3;
+  LOW_SULPHUR_GASOIL = 4;
+  RBOB_GASOLINE = 5;
+  SINGAPORE_FO_380CST = 6;
+}
+
+enum InstrumentType {
+  INSTRUMENT_TYPE_UNSPECIFIED = 0;
+  COMMODITY_SWAP = 1;
+  ASIAN_AVERAGE_PRICE_OPTION = 2;
+  CRACK_SPREAD_SWAP = 3;
+  CALENDAR_SPREAD_OPTION = 4;
+  EUROPEAN_SWAPTION = 5;
+}
+
+enum OptionType {
+  OPTION_TYPE_UNSPECIFIED = 0;
+  CALL = 1;
+  PUT = 2;
+}
+
+message ForwardPoint {
+  google.protobuf.Timestamp delivery_start = 1;
+  google.protobuf.Timestamp delivery_end = 2;
+  double forward_price = 3;
+  double bid = 4;
+  double ask = 5;
+  double open_interest = 6;
+}
+
+message ForwardCurveSnapshot {
+  string curve_id = 1;
+  CommodityUnderlying underlying = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  repeated ForwardPoint strip = 4;
+  string calibration_method = 5;
+  uint64 sequence_number = 6;
+}
+
+message VolatilitySurfaceSnapshot {
+  string surface_id = 1;
+  CommodityUnderlying underlying = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  repeated double tenors_days = 4;
+  repeated double delta_strikes = 5;
+  repeated double implied_vols = 6;
+  string parametrization = 7;
+}
+
+message PricingRequest {
+  string request_id = 1;
+  string tenant_id = 2;
+  InstrumentType instrument_type = 3;
+  CommodityUnderlying underlying_primary = 4;
+  CommodityUnderlying underlying_secondary = 5;
+  OptionType option_type = 6;
+  double strike = 7;
+  google.protobuf.Timestamp pricing_date = 8;
+  google.protobuf.Timestamp averaging_start_date = 9;
+  google.protobuf.Timestamp averaging_end_date = 10;
+  repeated double realized_fixings = 11;
+  uint32 total_fixing_count = 12;
+  double notional_quantity = 13;
+  string quantity_unit = 14;
+}
+
+message GreeksMatrix {
+  double delta = 1;
+  double gamma = 2;
+  double vega = 3;
+  double cross_vega = 4;
+  double theta = 5;
+  double rho = 6;
+  double vanna = 7;
+  double volga = 8;
+}
+
+message PricingResponse {
+  string request_id = 1;
+  double fair_value_unit = 2;
+  double total_premium = 3;
+  GreeksMatrix greeks = 4;
+  double intrinsic_value = 5;
+  double time_value = 6;
+  uint64 compute_time_micros = 7;
+  string engine_used = 8;
+}
+
+message AlphaSignal {
+  string signal_id = 1;
+  CommodityUnderlying underlying = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  double directional_bias = 4;
+  double prompt_roll_pressure = 5;
+  double inventory_imbalance = 6;
+  double recommended_skew_bps = 7;
+  double confidence_score = 8;
+}
