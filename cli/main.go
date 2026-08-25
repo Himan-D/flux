@@ -41,6 +41,7 @@ func printUsage() {
 	printBanner()
 	fmt.Println("Usage: flux <command> [options]")
 	fmt.Println("\nAvailable Commands:")
+	fmt.Println("  about      Display platform architecture, mathematical models & performance summary")
 	fmt.Println("  rfq        Request two-way firm quote and execute OTC derivative trades")
 	fmt.Println("  auth       Manage enterprise JWT bearer tokens and RBAC session security")
 	fmt.Println("  audit      Inspect immutable SOC2 / ISO 27001 hash-chained audit trails")
@@ -323,6 +324,8 @@ func handleREPL() {
 		args := parts[1:]
 
 		switch cmd {
+		case "about":
+			handleAbout(args)
 		case "rfq":
 			handleRFQ(args)
 		case "auth":
@@ -406,6 +409,8 @@ func main() {
 	args := os.Args[2:]
 
 	switch command {
+	case "about":
+		handleAbout(args)
 	case "rfq":
 		handleRFQ(args)
 	case "auth":
