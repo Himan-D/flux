@@ -28,11 +28,11 @@ const (
 func printBanner() {
 	fmt.Printf("%s%s", Bold, Cyan)
 	fmt.Println("╔══════════════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║  ███████╗██╗     ██╗   ██╗██╗  ██╗     FLUX TERMINAL QUANT CLI (FAANG-TIER)  ║")
+	fmt.Println("║  ███████╗██╗     ██╗   ██╗██╗  ██╗     FLUX INSTITUTIONAL TRADING CLI        ║")
 	fmt.Println("║  ██╔════╝██║     ██║   ██║╚██╗██╔╝     High-Performance Quant & SMM Engine   ║")
 	fmt.Println("║  █████╗  ██║     ██║   ██║ ╚███╔╝      Version 1.0.0 (Darwin/ARM64)          ║")
 	fmt.Println("║  ██╔══╝  ██║     ██║   ██║ ██╔██╗      Aeron 3-Node Raft • C++20 AVX-512     ║")
-	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Pricing Latency: 625 ns (0.62 µs)     ║")
+	fmt.Println("║  ██║     ███████╗╚██████╔╝██╔╝ ██╗     Fast-Path Latency: 625 ns (0.62 µs)   ║")
 	fmt.Println("╚══════════════════════════════════════════════════════════════════════════════╝")
 	fmt.Printf("%s\n", Reset)
 }
@@ -42,12 +42,15 @@ func printUsage() {
 	fmt.Println("Usage: flux <command> [options]")
 	fmt.Println("\nAvailable Commands:")
 	fmt.Println("  rfq        Request two-way firm quote and execute OTC derivative trades")
+	fmt.Println("  blotter    Inspect executed trade records, MTM PnL & SDR audit reports")
+	fmt.Println("  stress     Run extreme stress tests (Negative Oil 2020, Hormuz Closure)")
 	fmt.Println("  book       Display live L2 order book depth ladder with liquidity bands")
 	fmt.Println("  risk       Inspect Central Risk Book (CRB), 99% VaR & Expected Shortfall")
 	fmt.Println("  curve      Display calibrated forward curve strips & SABR vol surfaces")
 	fmt.Println("  agents     Execute the Multi-Agent AI triad (Curve, Signal, Logistics, Pricing)")
 	fmt.Println("  logistics  Monitor maritime vessel fixtures, laytime & demurrage accruals")
 	fmt.Println("  xva        Compute multi-curve CVA / DVA / FVA and ISDA SIMM margin calls")
+	fmt.Println("  config     Manage active tenant, desk, and API configuration profiles")
 	fmt.Println("  repl       Launch interactive trading terminal shell (REPL mode)")
 	fmt.Println("  monitor    Launch live streaming market tick & quote monitor")
 	fmt.Println("\nFlags supported on all commands:")
@@ -211,7 +214,7 @@ func handleCurve(args []string) {
 	fmt.Println("│ M03          │  30.0%   │  26.0%   │    25.0%     │  24.0%   │  26.0%   │")
 	fmt.Println("│ M06          │  28.0%   │  25.0%   │    24.0%     │  23.0%   │  25.0%   │")
 	fmt.Println("│ M12          │  27.0%   │  24.0%   │    23.0%     │  22.0%   │  24.0%   │")
-	fmt.Println("└──────────────┴──────────┴──────────────┴──────────┴──────────┴──────────┘\n")
+	fmt.Println("└──────────────┴──────────┴──────────┴──────────────┴──────────┴──────────┘\n")
 }
 
 func handleAgents(args []string) {
@@ -313,6 +316,10 @@ func handleREPL() {
 		switch cmd {
 		case "rfq":
 			handleRFQ(args)
+		case "blotter":
+			handleBlotter(args)
+		case "stress":
+			handleStress(args)
 		case "book":
 			handleBook(args)
 		case "risk":
@@ -325,8 +332,10 @@ func handleREPL() {
 			handleLogistics(args)
 		case "xva":
 			handleXVA(args)
+		case "config":
+			handleConfig(args)
 		case "help":
-			fmt.Println("Commands: rfq, book, risk, curve, agents, logistics, xva, exit")
+			fmt.Println("Commands: rfq, blotter, stress, book, risk, curve, agents, logistics, xva, config, exit")
 		default:
 			fmt.Printf("Unknown command: %s. Type 'help' for available commands.\n", cmd)
 		}
@@ -372,6 +381,10 @@ func main() {
 	switch command {
 	case "rfq":
 		handleRFQ(args)
+	case "blotter":
+		handleBlotter(args)
+	case "stress":
+		handleStress(args)
 	case "book":
 		handleBook(args)
 	case "risk":
@@ -384,6 +397,8 @@ func main() {
 		handleLogistics(args)
 	case "xva":
 		handleXVA(args)
+	case "config":
+		handleConfig(args)
 	case "repl", "interactive":
 		handleREPL()
 	case "monitor":
