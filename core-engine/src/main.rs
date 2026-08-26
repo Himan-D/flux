@@ -2,51 +2,60 @@ use std::time::Instant;
 use flux_core::crb_hedger::CentralRiskBook;
 use flux_core::smm_quoter::SystematicMarketMaker;
 use flux_core::collateral_simm_manager::{CollateralSIMMManager, CounterpartyCSAAgreement};
-use flux_core::aeron_cluster_sequencer::AeronClusterSequencer;
 use flux_core::models::{BenchmarkAsset, RiskSensitivity};
 
 fn main() {
     println!("====================================================================");
-    println!("  FLUX RUST CORE EMPIRICAL 1,000,000-RUN SCALE BENCHMARK            ");
+    println!("  FLUX RUST BENCHMARK HARNESS (BATCH-TIMED & SPECIFIED)             ");
+    println!("====================================================================");
+    println!("  Environment Specifications:");
+    println!("  • Toolchain:       Rust 1.75+ (rustc --release, target-cpu=native)");
+    println!("  • Measurement:     Batch Timing (10,000 iters/batch to eliminate");
+    println!("                     timer syscall distortion and 41.67ns clock ticks)");
     println!("====================================================================\n");
 
-    // 1. SMM Quoting Engine Benchmark (1,000,000 iterations)
-    println!("[1] Benchmarking 1,000,000 Systematic Market Maker Quote Proposals...");
+    const TOTAL_RUNS: usize = 1_000_000;
+    const BATCH_SIZE: usize = 10_000;
+    const NUM_BATCHES: usize = TOTAL_RUNS / BATCH_SIZE;
+
+    // 1. Systematic Market Maker Quote Proposals
+    println!("[1] Benchmarking SMM Quote Proposals (Avellaneda-Stoikov + Skew) (1,000,000 runs)...");
     let smm = SystematicMarketMaker::new(0.0001, 2.5);
-    let mut latencies_nanos = Vec::with_capacity(1_000_000);
-    let start_total = Instant::now();
+    let mut batch_latencies_ns = Vec::with_capacity(NUM_BATCHES);
 
-    for i in 0..1_000_000 {
-        let inv = (i % 20000) as f64 - 10000.0;
-        let t0 = Instant::now();
-        let (_quote, _) = smm.generate_quote(
-            BenchmarkAsset::IceBrent,
-            82.50,
-            inv,
-            0.28,
-            0.25,
-            0.35,
-        );
-        latencies_nanos.push(t0.elapsed().as_nanos());
+    let start_total_smm = Instant::now();
+    for b in 0..NUM_BATCHES {
+        let t_start = Instant::now();
+        for i in 0..BATCH_SIZE {
+            let inv = ((b * BATCH_SIZE + i) % 20000) as f64 - 10000.0;
+            let (_quote, _) = smm.generate_quote(
+                BenchmarkAsset::IceBrent,
+                82.50,
+                inv,
+                0.28,
+                0.25,
+                0.35,
+            );
+        }
+        let batch_ns = t_start.elapsed().as_nanos() as f64 / BATCH_SIZE as f64;
+        batch_latencies_ns.push(batch_ns);
     }
-    let total_smm_ms = start_total.elapsed().as_secs_f64() * 1000.0;
-    let smm_ops_sec = (1_000_000.0 / total_smm_ms) * 1000.0;
+    let total_smm_ms = start_total_smm.elapsed().as_secs_f64() * 1000.0;
+    let smm_ops_sec = (TOTAL_RUNS as f64 / total_smm_ms) * 1000.0;
 
-    latencies_nanos.sort_unstable();
-    let p50 = latencies_nanos[500_000];
-    let p90 = latencies_nanos[900_000];
-    let p99 = latencies_nanos[990_000];
-    let p999 = latencies_nanos[999_000];
+    batch_latencies_ns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let p50_smm = batch_latencies_ns[NUM_BATCHES * 50 / 100];
+    let p90_smm = batch_latencies_ns[NUM_BATCHES * 90 / 100];
+    let p99_smm = batch_latencies_ns[NUM_BATCHES * 99 / 100];
 
-    println!("    -> Total Duration:    {:.2} ms", total_smm_ms);
-    println!("    -> Measured Speed:    {:.2} Million quotes / sec ({:.0} ops/s)", smm_ops_sec / 1_000_000.0, smm_ops_sec);
-    println!("    -> Median (p50):      {} ns ({:.3} µs)", p50, p50 as f64 / 1000.0);
-    println!("    -> p90 Latency:       {} ns", p90);
-    println!("    -> p99 Latency:       {} ns", p99);
-    println!("    -> p99.9 Latency:     {} ns\n", p999);
+    println!("    -> Total Wall Time:   {:.2} ms", total_smm_ms);
+    println!("    -> Average Speed:     {:.2} Million quotes / sec ({:.0} ops/s)", smm_ops_sec / 1_000_000.0, smm_ops_sec);
+    println!("    -> Batch Mean (p50):  {:.2} ns per quote", p50_smm);
+    println!("    -> Batch p90:         {:.2} ns", p90_smm);
+    println!("    -> Batch p99:         {:.2} ns\n", p99_smm);
 
-    // 2. Central Risk Book Factor Netting Benchmark (100,000 iterations)
-    println!("[2] Benchmarking 100,000 Central Risk Book Cross-Desk Netting Cycles...");
+    // 2. Central Risk Book Factor Netting
+    println!("[2] Benchmarking Central Risk Book Multi-Desk Factor Netting (100,000 runs)...");
     let crb = CentralRiskBook::new(0.0001, 0.00005);
     let exposures = vec![
         RiskSensitivity { desk_id: "CRUDE_LON".to_string(), asset: BenchmarkAsset::IceBrent, delta_quantity: 100000.0, vega: 45000.0 },
@@ -55,46 +64,34 @@ fn main() {
         RiskSensitivity { desk_id: "CRUDE_HOU".to_string(), asset: BenchmarkAsset::IceBrent, delta_quantity: -75000.0, vega: 30000.0 },
     ];
 
-    let mut crb_latencies = Vec::with_capacity(100_000);
-    let start_crb = Instant::now();
+    const CRB_RUNS: usize = 100_000;
+    const CRB_BATCH: usize = 1_000;
+    const CRB_NUM_BATCHES: usize = CRB_RUNS / CRB_BATCH;
+    let mut crb_batch_latencies = Vec::with_capacity(CRB_NUM_BATCHES);
 
-    for _ in 0..100_000 {
-        let t0 = Instant::now();
-        let (_slices, _) = crb.compute_hedges(&exposures, 300.0);
-        crb_latencies.push(t0.elapsed().as_nanos());
+    let start_crb = Instant::now();
+    for _ in 0..CRB_NUM_BATCHES {
+        let t_start = Instant::now();
+        for _ in 0..CRB_BATCH {
+            let (_slices, _) = crb.compute_hedges(&exposures, 300.0);
+        }
+        let batch_ns = t_start.elapsed().as_nanos() as f64 / CRB_BATCH as f64;
+        crb_batch_latencies.push(batch_ns);
     }
     let total_crb_ms = start_crb.elapsed().as_secs_f64() * 1000.0;
-    let crb_ops_sec = (100_000.0 / total_crb_ms) * 1000.0;
-    crb_latencies.sort_unstable();
+    let crb_ops_sec = (CRB_RUNS as f64 / total_crb_ms) * 1000.0;
 
-    println!("    -> Total Duration:    {:.2} ms", total_crb_ms);
-    println!("    -> Measured Speed:    {:.2} Million rebalances / sec ({:.0} ops/s)", crb_ops_sec / 1_000_000.0, crb_ops_sec);
-    println!("    -> Median (p50):      {} ns ({:.3} µs)", crb_latencies[50_000], crb_latencies[50_000] as f64 / 1000.0);
-    println!("    -> p99 Latency:       {} ns\n", crb_latencies[99_000]);
+    crb_batch_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let p50_crb = crb_batch_latencies[CRB_NUM_BATCHES * 50 / 100];
+    let p99_crb = crb_batch_latencies[CRB_NUM_BATCHES * 99 / 100];
 
-    // 3. Aeron 3-Node Raft Clustered Sequencer Benchmark (100,000 iterations)
-    println!("[3] Benchmarking 100,000 Aeron Raft Clustered Sequencer Replications...");
-    let mut sequencer = AeronClusterSequencer::new_3node_cluster();
-    let mut seq_latencies = Vec::with_capacity(100_000);
-    let start_seq = Instant::now();
+    println!("    -> Total Wall Time:   {:.2} ms", total_crb_ms);
+    println!("    -> Average Speed:     {:.2} Million rebalances / sec ({:.0} ops/s)", crb_ops_sec / 1_000_000.0, crb_ops_sec);
+    println!("    -> Batch Mean (p50):  {:.2} ns per rebalance", p50_crb);
+    println!("    -> Batch p99:         {:.2} ns\n", p99_crb);
 
-    for i in 0..100_000 {
-        let payload = format!("{{\"trade_id\": \"trd-{}\"}}", i);
-        let t0 = Instant::now();
-        let _event = sequencer.sequence_and_commit(&payload);
-        seq_latencies.push(t0.elapsed().as_nanos());
-    }
-    let total_seq_ms = start_seq.elapsed().as_secs_f64() * 1000.0;
-    let seq_ops_sec = (100_000.0 / total_seq_ms) * 1000.0;
-    seq_latencies.sort_unstable();
-
-    println!("    -> Total Duration:    {:.2} ms", total_seq_ms);
-    println!("    -> Measured Speed:    {:.2} Million events / sec ({:.0} ops/s)", seq_ops_sec / 1_000_000.0, seq_ops_sec);
-    println!("    -> Median (p50):      {} ns ({:.3} µs)", seq_latencies[50_000], seq_latencies[50_000] as f64 / 1000.0);
-    println!("    -> p99 Latency:       {} ns\n", seq_latencies[99_000]);
-
-    // 4. Dynamic ISDA SIMM Margin Call Evaluator (1,000,000 iterations)
-    println!("[4] Benchmarking 1,000,000 Dynamic ISDA SIMM Margin Call Calculations...");
+    // 3. Dynamic ISDA SIMM Margin Call Evaluator
+    println!("[3] Benchmarking Dynamic ISDA SIMM Margin Call Calculations (1,000,000 runs)...");
     let csa = CounterpartyCSAAgreement {
         counterparty_id: "CPTY_GLENCORE_ENERGY".to_string(),
         threshold_usd: 5_000_000.0,
@@ -102,25 +99,31 @@ fn main() {
         current_collateral_posted_usd: 6_200_000.0,
         isda_simm_initial_margin_required_usd: 3_800_000.0,
     };
-    let mut simm_latencies = Vec::with_capacity(1_000_000);
+    let mut simm_batch_latencies = Vec::with_capacity(NUM_BATCHES);
     let start_simm = Instant::now();
 
-    for i in 0..1_000_000 {
-        let mtm = 5_000_000.0 + (i % 10000) as f64 * 1000.0;
-        let t0 = Instant::now();
-        let _action = CollateralSIMMManager::evaluate_margin_call(&csa, mtm);
-        simm_latencies.push(t0.elapsed().as_nanos());
+    for b in 0..NUM_BATCHES {
+        let t_start = Instant::now();
+        for i in 0..BATCH_SIZE {
+            let mtm = 5_000_000.0 + ((b * BATCH_SIZE + i) % 10000) as f64 * 1000.0;
+            let _action = CollateralSIMMManager::evaluate_margin_call(&csa, mtm);
+        }
+        let batch_ns = t_start.elapsed().as_nanos() as f64 / BATCH_SIZE as f64;
+        simm_batch_latencies.push(batch_ns);
     }
     let total_simm_ms = start_simm.elapsed().as_secs_f64() * 1000.0;
-    let simm_ops_sec = (1_000_000.0 / total_simm_ms) * 1000.0;
-    simm_latencies.sort_unstable();
+    let simm_ops_sec = (TOTAL_RUNS as f64 / total_simm_ms) * 1000.0;
 
-    println!("    -> Total Duration:    {:.2} ms", total_simm_ms);
-    println!("    -> Measured Speed:    {:.2} Million evaluations / sec ({:.0} ops/s)", simm_ops_sec / 1_000_000.0, simm_ops_sec);
-    println!("    -> Median (p50):      {} ns", simm_latencies[500_000]);
-    println!("    -> p99 Latency:       {} ns", simm_latencies[990_000]);
+    simm_batch_latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let p50_simm = simm_batch_latencies[NUM_BATCHES * 50 / 100];
+    let p99_simm = simm_batch_latencies[NUM_BATCHES * 99 / 100];
 
-    println!("\n====================================================================");
-    println!("  ALL RUST SCALE BENCHMARKS EXECUTED & VALIDATED SUCCESSFULLY       ");
+    println!("    -> Total Wall Time:   {:.2} ms", total_simm_ms);
+    println!("    -> Average Speed:     {:.2} Million evaluations / sec ({:.0} ops/s)", simm_ops_sec / 1_000_000.0, simm_ops_sec);
+    println!("    -> Batch Mean (p50):  {:.2} ns per evaluation", p50_simm);
+    println!("    -> Batch p99:         {:.2} ns\n", p99_simm);
+
+    println!("====================================================================");
+    println!("  ALL RUST BATCH BENCHMARKS COMPLETED                               ");
     println!("====================================================================");
 }

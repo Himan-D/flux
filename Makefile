@@ -9,6 +9,7 @@ all: build test
 build:
 	@echo "==> Building C++20 Pricing Kernels..."
 	@cd core-engine && clang++ -std=c++20 -O3 -Wall -Wextra -Werror -Iinclude tests/test_pricing.cpp -o run_tests
+	@cd core-engine && clang++ -std=c++20 -O3 -Iinclude tests/test_reference_validation.cpp -o tests/test_reference_validation
 	@cd core-engine && clang++ -std=c++20 -O3 -Iinclude tests/benchmark_scale.cpp -o tests/benchmark_scale
 	@echo "==> Building Rust Core Engine & Aeron Sequencer..."
 	@cd core-engine && cargo build --release
@@ -19,13 +20,15 @@ build:
 	@echo "==> Build Complete: ./bin/flux"
 
 test:
-	@echo "==> [1/4] Running C++20 Unit Tests..."
+	@echo "==> [1/5] Running C++20 Unit Tests..."
 	@./core-engine/run_tests
-	@echo "==> [2/4] Running Rust Core Tests..."
+	@echo "==> [2/5] Running C++20 Mathematical Reference Validation (Monte Carlo)..."
+	@./core-engine/tests/test_reference_validation
+	@echo "==> [3/5] Running Rust Core Tests..."
 	@cd core-engine && cargo test
-	@echo "==> [3/4] Running Python Multi-Agent Pytest Suite..."
+	@echo "==> [4/5] Running Python Multi-Agent Pytest Suite..."
 	@python3 agents/tests/test_agents.py
-	@echo "==> [4/4] Running Go SaaS Gateway Tests..."
+	@echo "==> [5/5] Running Go SaaS Gateway Tests..."
 	@cd saas-control && go test -v .
 
 benchmark: build

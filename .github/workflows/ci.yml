@@ -23,6 +23,12 @@ jobs:
           clang++ -std=c++20 -O3 -Wall -Wextra -Werror -Iinclude tests/test_pricing.cpp -o run_tests
           ./run_tests
 
+      - name: Compile and Run Mathematical Reference Validation (Monte Carlo Tolerance)
+        run: |
+          cd core-engine
+          clang++ -std=c++20 -O3 -Iinclude tests/test_reference_validation.cpp -o test_reference_validation
+          ./test_reference_validation
+
       - name: Execute 1,000,000-Run Scale Benchmark
         run: |
           cd core-engine
