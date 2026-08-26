@@ -188,5 +188,74 @@ func handlePrice(args []string) {
 		fmt.Printf("  • Crude Delta:          %.4f\n", deltaCrude)
 		fmt.Printf("  • Cross-Vega:           %.4f\n", crossVega)
 		fmt.Printf("  • Kernel Execution:     %s125 ns (0.12 µs)%s\n\n", Green, Reset)
+
+	case "sabr":
+		fs := flag.NewFlagSet("price sabr", flag.ExitOnError)
+		fwd := fs.Float64("fwd", 82.50, "Forward benchmark price ($/bbl)")
+		strike := fs.Float64("strike", 82.50, "Strike price ($/bbl)")
+		alpha := fs.Float64("alpha", 0.28, "Initial volatility level alpha")
+		beta := fs.Float64("beta", 0.70, "CEV elasticity exponent beta (0.0 to 1.0)")
+		rho := fs.Float64("rho", -0.25, "Correlation rho between spot and vol")
+		nu := fs.Float64("nu", 0.40, "Volatility of volatility nu")
+		ttm := fs.Float64("ttm", 0.25, "Time to maturity (years)")
+		jsonOut := fs.Bool("json", false, "Output in JSON format")
+		fs.Parse(subArgs)
+
+		F := *fwd
+		K := *strike
+		T := *ttm
+		a := *alpha
+		b := *beta
+		r := *rho
+		n := *nu
+
+		oneMinusB := 1.0 - b
+		FK := F * K
+		FKPow := math.Pow(FK, oneMinusB*0.5)
+		logFK := math.Log(F / K)
+
+		var sabrVol float64
+		if math.Abs(F-K) < 1e-6 {
+			FPow := math.Pow(F, oneMinusB)
+			term2 := 1.0 + ((oneMinusB*oneMinusB/24.0)*(a*a/(FPow*FPow)) + (0.25*r*b*n*a/FPow) + ((2.0-3.0*r*r)/24.0)*n*n)*T
+			sabrVol = (a / FPow) * term2
+		} else {
+			z := (n / a) * FKPow * logFK
+			sqrtTerm := math.Sqrt(1.0 - 2.0*r*z + z*z)
+			chiZ := math.Log((sqrtTerm + z - r) / (1.0 - r))
+			zOverChi := 1.0
+			if math.Abs(z) >= 1e-6 {
+				zOverChi = z / chiZ
+			}
+			denomExp := 1.0 + (oneMinusB*oneMinusB/24.0)*logFK*logFK
+			term2 := 1.0 + ((oneMinusB*oneMinusB/24.0)*(a*a/math.Pow(FK, oneMinusB)) + (0.25*r*b*n*a/FKPow) + ((2.0-3.0*r*r)/24.0)*n*n)*T
+			sabrVol = (a / (FKPow * denomExp)) * zOverChi * term2
+		}
+
+		if *jsonOut {
+			json.NewEncoder(os.Stdout).Encode(map[string]interface{}{
+				"model":              "HAGAN_SABR_2002",
+				"forward":            F,
+				"strike":             K,
+				"implied_volatility": sabrVol,
+				"alpha":              a,
+				"beta":               b,
+				"rho":                r,
+				"nu":                 n,
+				"time_to_maturity":   T,
+			})
+			return
+		}
+
+		printBanner()
+		fmt.Printf("%s[HAGAN ET AL. (2002) SABR IMPLIED VOLATILITY SMILE ENGINE]%s\n\n", Bold, Reset)
+		fmt.Printf("  • Forward Price (F):    $%.2f / bbl\n", F)
+		fmt.Printf("  • Strike Price (K):     $%.2f / bbl\n", K)
+		fmt.Printf("  • ATM Volatility (α):   %.4f\n", a)
+		fmt.Printf("  • CEV Exponent (β):     %.2f\n", b)
+		fmt.Printf("  • Correlation (ρ):      %+.2f\n", r)
+		fmt.Printf("  • Vol of Vol (ν):       %.2f\n", n)
+		fmt.Printf("  • Expiry Horizon (T):   %.2f years\n\n", T)
+		fmt.Printf("%sSABR CALIBRATED IMPLIED BLACK VOLATILITY:%s %s%.2f%%%s\n\n", Bold, Reset, Green, sabrVol*100.0, Reset)
 	}
 }

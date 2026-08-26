@@ -3,6 +3,7 @@ pub mod crb_hedger;
 pub mod smm_quoter;
 pub mod collateral_simm_manager;
 pub mod aeron_cluster_sequencer;
+pub mod order_state_machine;
 
 #[cfg(test)]
 mod tests {
@@ -59,13 +60,69 @@ mod tests {
 
     #[test]
     fn test_aeron_sequencer_monotonicity() {
-        let mut sequencer = AeronClusterSequencer::new_3node_cluster();
-        let ev1 = sequencer.sequence_and_commit("ORDER_1");
-        let ev2 = sequencer.sequence_and_commit("ORDER_2");
+        let mut seq = AeronClusterSequencer::new_3node_cluster();
+        let ev1 = seq.sequence_and_commit("payload_1");
+        let ev2 = seq.sequence_and_commit("payload_2");
 
         assert_eq!(ev1.sequence_number, 1);
         assert_eq!(ev2.sequence_number, 2);
-        assert!(ev2.sequence_number > ev1.sequence_number);
-        assert_eq!(ev1.quorum_acks, 2);
+        assert_eq!(ev1.quorum_acks, 2, "3-node cluster must require 2 ACKs for quorum");
+    }
+
+    #[test]
+    fn test_order_state_machine_lifecycle() {
+        use order_state_machine::{OrderStateMachine, OrderRequest, OrderSide, OrderState};
+
+        let mut osm = OrderStateMachine::new(1_000_000.0, 0.05); // $1M limit, 5% collar
+
+        // 1. Submit normal order
+        let req = OrderRequest {
+            cl_ord_id: "ORD-TEST-001".to_string(),
+            desk_id: "DESK_CRUDE_LON".to_string(),
+            symbol: "BRENT".to_string(),
+            side: OrderSide::Buy,
+            price: 82.50,
+            quantity: 5000.0,
+            max_notional_limit: 1_000_000.0,
+        };
+        let ack = osm.submit_order(req, 82.50);
+        assert_eq!(ack.state, OrderState::Acked);
+
+        // 2. Reject duplicate ClOrdID (Idempotency)
+        let dup_req = OrderRequest {
+            cl_ord_id: "ORD-TEST-001".to_string(),
+            desk_id: "DESK_CRUDE_LON".to_string(),
+            symbol: "BRENT".to_string(),
+            side: OrderSide::Buy,
+            price: 82.50,
+            quantity: 5000.0,
+            max_notional_limit: 1_000_000.0,
+        };
+        let dup_ack = osm.submit_order(dup_req, 82.50);
+        assert_eq!(dup_ack.state, OrderState::Rejected);
+        assert!(dup_ack.text.contains("Duplicate ClOrdID"));
+
+        // 3. Reject price collar violation
+        let bad_price_req = OrderRequest {
+            cl_ord_id: "ORD-TEST-002".to_string(),
+            desk_id: "DESK_CRUDE_LON".to_string(),
+            symbol: "BRENT".to_string(),
+            side: OrderSide::Buy,
+            price: 100.00, // 21% away from mid 82.50
+            quantity: 1000.0,
+            max_notional_limit: 1_000_000.0,
+        };
+        let collar_ack = osm.submit_order(bad_price_req, 82.50);
+        assert_eq!(collar_ack.state, OrderState::Rejected);
+        assert!(collar_ack.text.contains("Price collar violation"));
+
+        // 4. Partial Fill & Full Fill
+        let fill1 = osm.process_fill("ORD-TEST-001", 2000.0, 82.50).unwrap();
+        assert_eq!(fill1.state, OrderState::PartiallyFilled);
+        assert_eq!(fill1.leaves_qty, 3000.0);
+
+        let fill2 = osm.process_fill("ORD-TEST-001", 3000.0, 82.50).unwrap();
+        assert_eq!(fill2.state, OrderState::Filled);
+        assert_eq!(fill2.leaves_qty, 0.0);
     }
 }
